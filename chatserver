@@ -1,0 +1,79 @@
+#include<stdio.h>
+#include<WinSock2.h>   //套接字头文件
+#pragma comment(lib,"ws2_32.lib")
+
+int main()
+{
+	// 1 加载套接字，初始化
+	WSADATA wd;          //结构体 已定义
+	if(0!=WSAStartup(MAKEWORD(2,2),&wd))
+	{
+		printf("加载套接字库失败,错误代码：%d\n",GetLastError()); 
+		return 0;
+	}
+
+	// 2 要2.2版本
+	if (LOBYTE(wd.wVersion) != 2 || HIBYTE(wd.wVersion) != 2)
+	{
+		printf("套接字版本不一致,错误代码：%d\n", GetLastError());    
+		return 0;
+	}
+	
+	// 3 创建套接字
+	SOCKET sockSrv=socket(AF_INET,SOCK_STREAM,0);    //套接字函数 参数（协议族，通信类型，特定协议）
+	SOCKADDR_IN addrSrv;
+	addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);     //绑定本机的服务器地址
+	addrSrv.sin_family = AF_INET;                         //协议族
+	addrSrv.sin_port = htons(6940);                       //端口
+	if (sockSrv == INVALID_SOCKET)
+	{
+		printf("创建套接字失败，错误代码：%d\n", GetLastError());
+		return 0;
+	}
+
+	// 4 绑定套接字
+	if (SOCKET_ERROR == bind(sockSrv, (sockaddr*)&addrSrv, sizeof(addrSrv)))
+	{
+		printf("绑定套接字失败，错误代码：%d\n", GetLastError());
+		return 0;
+	}
+	
+	// 5 将套接字设置为监听模式
+	if (SOCKET_ERROR == listen(sockSrv, 5))
+	{
+		printf("监听失败，错误代码：%d\n", GetLastError());
+		return 0;
+	}
+
+	// 6 等待客户端连接
+	SOCKADDR_IN addrClient;
+	int len = sizeof(SOCKADDR);
+	while (1)
+	{
+		SOCKET sockClient = accept(sockSrv, (SOCKADDR*)&addrClient, &len);
+		printf("欢迎客户端%s ：%d连接\n", inet_ntoa(addrClient.sin_addr), addrClient.sin_port);
+		char sendMsg[100], recMsg[100];
+		memset(sendMsg, 0, 100);
+		memset(recMsg, 0, 100);
+		while (1)
+		{
+			printf("请输入要发送的信息【按q退出】\n");
+			scanf("%s", sendMsg);
+			if (strcmp(sendMsg, "q") == 0)
+			{
+				printf("结束聊天\n");
+				strcpy(sendMsg, "断开连接");
+				send(sockClient, sendMsg,strlen(sendMsg),0 );
+				closesocket(sockClient);
+				break;
+			}
+			send(sockClient, sendMsg, strlen(sendMsg), 0);
+
+			recv(sockClient, recMsg, 100, 0);
+			printf("<客户>：%s\n", recMsg);
+		}
+
+	}
+
+	return 0;
+}
